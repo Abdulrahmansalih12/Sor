@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SNR Backtest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--accent:#56B6C2;--rev:#4EC08A;--cont:#E0685F;--warn:#D9A441;--notrade:#7A8290;--up:#4EC08A;--down:#E0685F;--r:16px}
+html[data-theme="dark"]{--bg:#0E1116;--bg2:#131820;--surface:#171E28;--surface-hi:#1D2632;--line:#28323F;--line-soft:#202935;--text:#EAEEF4;--muted:#8A95A5;--faint:#5C6675;--chip-text:#06222A;--shadow:0 1px 0 rgba(255,255,255,.03) inset,0 12px 32px -16px rgba(0,0,0,.7);--body-bg:radial-gradient(1200px 600px at 80% -10%,rgba(86,182,194,.07),transparent 60%),radial-gradient(900px 500px at -10% 10%,rgba(78,192,138,.04),transparent 55%),#0E1116}
+html[data-theme="light"]{--bg:#F2F5F8;--bg2:#FFFFFF;--surface:#FFFFFF;--surface-hi:#FFFFFF;--line:#D8DEE6;--line-soft:#E6EAEF;--text:#161C24;--muted:#5E6876;--faint:#9AA3AF;--chip-text:#06222A;--shadow:0 1px 2px rgba(16,24,36,.04),0 12px 28px -18px rgba(16,24,36,.25);--body-bg:radial-gradient(1200px 600px at 80% -10%,rgba(86,182,194,.10),transparent 60%),radial-gradient(900px 500px at -10% 10%,rgba(78,192,138,.07),transparent 55%),#F2F5F8}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;-webkit-text-size-adjust:100%}
+body{background:var(--body-bg);color:var(--text);font-family:'IBM Plex Sans Arabic',system-ui,sans-serif;min-height:100vh;line-height:1.55;padding-bottom:48px;transition:background .4s,color .3s}
+.num{font-family:'Space Grotesk',monospace;font-variant-numeric:tabular-nums;direction:ltr;unicode-bidi:embed}
+.wrap{max-width:780px;margin:0 auto;padding:0 16px}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 0 4px;gap:10px}
+.controls{display:flex;gap:8px;align-items:center}
+.ctrl{background:var(--surface);border:1px solid var(--line-soft);border-radius:999px;color:var(--muted);font-family:inherit;font-size:.82rem;font-weight:600;cursor:pointer;transition:.2s;display:inline-flex;align-items:center;gap:6px;box-shadow:var(--shadow)}
+.ctrl#themeBtn{padding:9px 12px}.ctrl#langBtn{padding:9px 14px}
+.ctrl:active{transform:scale(.95)}
+.brandname{font-family:'Space Grotesk';font-size:.78rem;color:var(--faint);font-weight:500;letter-spacing:.02em}
+header{padding:8px 0}
+.eyebrow{font-size:.72rem;letter-spacing:.18em;color:var(--accent);font-weight:600;text-transform:uppercase}
+h1{font-size:1.5rem;font-weight:700;letter-spacing:-.01em;margin-top:6px}
+h1 .sub{display:block;font-size:.85rem;color:var(--muted);font-weight:400;margin-top:5px}
+.sessmeta{margin-top:14px;display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line-soft);border-radius:999px;padding:6px 14px;font-size:.8rem;color:var(--muted);box-shadow:var(--shadow)}
+.sessmeta b{color:var(--text)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+nav{display:flex;gap:8px;margin:18px 0;background:var(--surface);border:1px solid var(--line-soft);border-radius:999px;padding:5px;box-shadow:var(--shadow)}
+nav button{flex:1;background:transparent;border:none;color:var(--muted);padding:11px 8px;border-radius:999px;font-family:inherit;font-size:.92rem;font-weight:600;cursor:pointer;transition:color .2s,background .3s}
+nav button.on{color:#06222A;background:linear-gradient(180deg,var(--accent),#3E97A2)}
+section{display:none}section.on{display:block}
+section.on>*{animation:rise .5s cubic-bezier(.2,.7,.2,1) backwards}
+section.on>*:nth-child(2){animation-delay:.05s}section.on>*:nth-child(3){animation-delay:.1s}section.on>*:nth-child(4){animation-delay:.15s}section.on>*:nth-child(5){animation-delay:.2s}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.card{background:linear-gradient(180deg,var(--surface-hi),var(--surface));border:1px solid var(--line-soft);border-radius:var(--r);padding:20px;margin-bottom:16px;box-shadow:var(--shadow);transition:transform .3s cubic-bezier(.2,.7,.2,1),border-color .3s}
+.card:hover{transform:translateY(-2px);border-color:var(--line)}
+.card h2{font-size:1.02rem;font-weight:700;letter-spacing:-.01em}
+.card h2 .hint{font-size:.76rem;color:var(--muted);font-weight:400;line-height:1.4;display:block;margin-top:4px}
+.card .body{margin-top:16px}
+label{display:block;font-size:.78rem;color:var(--muted);margin-bottom:7px;font-weight:500}
+input[type=number],input[type=text]{width:100%;background:var(--bg2);border:1px solid var(--line);color:var(--text);border-radius:11px;padding:13px 14px;font-family:'Space Grotesk',monospace;font-size:1.05rem;transition:border-color .2s,box-shadow .2s}
+input[type=text]{font-family:inherit;font-size:1rem}
+input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(86,182,194,.14)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.chips{display:flex;flex-wrap:wrap;gap:9px}
+.chip{background:var(--bg2);border:1px solid var(--line);color:var(--muted);border-radius:11px;padding:11px 15px;font-size:.86rem;font-family:inherit;font-weight:500;cursor:pointer;transition:.18s cubic-bezier(.2,.7,.2,1)}
+.chip:active{transform:scale(.96)}
+.chip.sel{background:linear-gradient(180deg,var(--accent),#3E97A2);border-color:var(--accent);color:var(--chip-text);font-weight:700;box-shadow:0 6px 18px -8px rgba(86,182,194,.7);transform:translateY(-1px)}
+.chip.sel.up{background:linear-gradient(180deg,var(--up),#36A06C);border-color:var(--up);color:#062417}
+.chip.sel.down{background:linear-gradient(180deg,var(--down),#C24B43);border-color:var(--down);color:#2A0B08}
+.chip.sel.nt{background:linear-gradient(180deg,var(--notrade),#5A6270);border-color:var(--notrade);color:#11151B}
+.btn{width:100%;background:linear-gradient(180deg,var(--accent),#3E97A2);color:#06222A;border:none;border-radius:13px;padding:16px;font-family:inherit;font-weight:700;font-size:1rem;cursor:pointer;margin-top:4px;transition:.2s;box-shadow:0 8px 22px -10px rgba(86,182,194,.7)}
+.btn:active{transform:scale(.985)}
+.btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line);box-shadow:none;margin-top:12px}
+.levels{background:var(--bg2);border:1px solid var(--line-soft);border-radius:12px;padding:6px 14px;margin-top:14px}
+.lv{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line-soft);font-size:.85rem}
+.lv:last-child{border-bottom:none}
+.lv .k{color:var(--muted)}.lv .v{font-family:'Space Grotesk';font-weight:600}
+.up-c{color:var(--up)}.down-c{color:var(--down)}
+.slist{display:flex;flex-direction:column;gap:8px}
+.sitem{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--bg2);border:1px solid var(--line-soft);border-radius:11px;padding:11px 13px;font-size:.84rem;animation:rise .4s backwards}
+.sitem .meta{display:flex;flex-direction:column;gap:3px;min-width:0}
+.sitem .line1{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tag{font-size:.74rem;padding:3px 9px;border-radius:7px;font-weight:600;white-space:nowrap}
+.tag.up{background:rgba(78,192,138,.16);color:var(--up)}
+.tag.down{background:rgba(224,104,95,.16);color:var(--down)}
+.tag.nt{background:rgba(122,130,144,.18);color:var(--notrade)}
+.tag.neu{background:rgba(138,149,165,.14);color:var(--muted)}
+.tag.tgt{background:rgba(86,182,194,.16);color:var(--accent)}
+.tag.move{background:rgba(217,164,65,.16);color:var(--warn)}
+.sitem .date{font-family:'Space Grotesk';color:var(--faint);font-size:.76rem}
+.sitem .note{color:var(--muted);font-size:.78rem;margin-top:2px}
+.del{background:none;border:none;color:var(--faint);cursor:pointer;font-size:1.1rem;padding:4px 8px;border-radius:7px;transition:.15s;flex-shrink:0}
+.del:active{color:var(--cont);background:rgba(224,104,95,.1)}
+.empty{color:var(--faint);font-size:.86rem;text-align:center;padding:18px 0;line-height:1.7}
+.hero{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.stat{background:linear-gradient(180deg,var(--surface-hi),var(--surface));border:1px solid var(--line-soft);border-radius:var(--r);padding:18px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.stat::after{content:"";position:absolute;inset:0;background:radial-gradient(120px 80px at 85% 0%,rgba(86,182,194,.1),transparent);pointer-events:none}
+.stat .label{font-size:.74rem;color:var(--muted);font-weight:500}
+.stat .big{font-family:'Space Grotesk';font-size:2rem;font-weight:700;letter-spacing:-.02em;margin-top:6px;line-height:1}
+.stat .sub{font-size:.74rem;color:var(--faint);margin-top:5px}
+.stat.full{grid-column:1/-1}
+.samplewarn{background:rgba(217,164,65,.1);border:1px solid rgba(217,164,65,.4);color:var(--warn);border-radius:12px;padding:12px 14px;font-size:.8rem;margin-bottom:16px;display:flex;gap:9px;align-items:flex-start;line-height:1.5}
+.samplewarn.hide{display:none}
+.filterbar{background:linear-gradient(180deg,var(--surface-hi),var(--surface));border:1px solid var(--line-soft);border-radius:var(--r);padding:16px;margin-bottom:16px;box-shadow:var(--shadow)}
+.filterbar .flabel{font-size:.74rem;color:var(--muted);font-weight:600;margin-bottom:9px;display:flex;justify-content:space-between;align-items:center}
+.filterbar .clearf{color:var(--accent);cursor:pointer;font-size:.74rem;font-weight:600}
+.fchip{padding:8px 13px;font-size:.8rem}
+.frow{margin-bottom:12px}.frow:last-child{margin-bottom:0}
+.bar{margin-bottom:13px}
+.bar .top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;font-size:.84rem}
+.bar .top .bl{color:var(--text);font-weight:500}
+.bar .top .bv{font-family:'Space Grotesk';font-weight:600}
+.bar .track{height:11px;background:var(--bg2);border-radius:6px;overflow:hidden;border:1px solid var(--line-soft);display:flex}
+.bar .seg{height:100%;width:0;transition:width 1s cubic-bezier(.2,.8,.2,1)}
+.tablewrap{overflow-x:auto;margin:0 -4px;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:.8rem;min-width:440px}
+th,td{padding:11px 9px;text-align:center;border-bottom:1px solid var(--line-soft)}
+th{color:var(--muted);font-weight:600;font-size:.74rem}
+td:first-child,th:first-child{text-align:right;white-space:nowrap;font-weight:600}
+html[dir=ltr] td:first-child,html[dir=ltr] th:first-child{text-align:left}
+td.val{font-family:'Space Grotesk';font-weight:600}
+tbody tr{transition:background .2s}
+tbody tr.frow-on{background:rgba(86,182,194,.08)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:14px;font-size:.74rem;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+footer{text-align:center;color:var(--faint);font-size:.72rem;margin-top:28px;line-height:1.7}
+html[dir=ltr]{text-align:left}
+@media (max-width:430px){.grid2{grid-template-columns:1fr}h1{font-size:1.3rem}.stat .big{font-size:1.7rem}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="topbar">
+  <div class="brandname">Abdulrahman Salih · @SNR_Trading</div>
+  <div class="controls">
+    <button class="ctrl" id="langBtn">🌐 <span id="langLabel">عربي</span></button>
+    <button class="ctrl" id="themeBtn">🌙</button>
+  </div>
+</div>
+
+<header>
+  <div class="eyebrow" data-i="eyebrow">SNR · London Session</div>
+  <h1 data-i="title">سلوك جلسة لندن<span class="sub" data-i="subtitle">سجّل لكل جلسة: وين فتحت لندن، أي سيولة اتّجهت لها، ووصلت الهدف لو لا</span></h1>
+  <div class="sessmeta"><span class="dot"></span><span data-i="recorded">جلسات مسجّلة:</span> <b class="num" id="sessCount">0</b></div>
+</header>
+
+<nav id="tabs">
+  <button data-t="entry" class="on" data-i="tabEntry">تسجيل جلسة</button>
+  <button data-t="stats" data-i="tabStats">الإحصائيات</button>
+</nav>
+
+<!-- ENTRY -->
+<section id="entry" class="on">
+  <div class="card">
+    <h2 data-i="tokyoRange">رينج طوكيو<span class="hint" data-i="tokyoHint">قمة وقاع جلسة طوكيو — اختياري، يحسب المستويات</span></h2>
+    <div class="body">
+      <div class="grid2">
+        <div><label data-i="tokyoHigh">قمة طوكيو</label><input type="number" id="tHigh" inputmode="decimal" placeholder="29620"></div>
+        <div><label data-i="tokyoLow">قاع طوكيو</label><input type="number" id="tLow" inputmode="decimal" placeholder="29430"></div>
+      </div>
+      <div class="levels" id="lvBox" style="display:none">
+        <div class="lv"><span class="k" data-i="liqAbove">سيولة فوق القمة</span><span class="v up-c" id="lvHigh"></span></div>
+        <div class="lv"><span class="k" data-i="midRange">نص الرينج</span><span class="v" id="lvMid"></span></div>
+        <div class="lv"><span class="k" data-i="liqBelow">سيولة تحت القاع</span><span class="v down-c" id="lvLow"></span></div>
+        <div class="lv"><span class="k" data-i="rangeSize">حجم الرينج</span><span class="v" id="lvSize"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 data-i="dayTitle2">يوم الجلسة<span class="hint" data-i="dayHint2">أي يوم كانت الجلسة — يغذّي إحصائية الأيام والفلتر</span></h2>
+    <div class="body"><div class="chips" id="dayPick">
+      <button class="chip" data-v="1" data-i="dayMon">الاثنين</button>
+      <button class="chip" data-v="2" data-i="dayTue">الثلاثاء</button>
+      <button class="chip" data-v="3" data-i="dayWed">الأربعاء</button>
+      <button class="chip" data-v="4" data-i="dayThu">الخميس</button>
+      <button class="chip" data-v="5" data-i="dayFri">الجمعة</button>
+    </div></div>
+  </div>
+
+  <div class="card">
+    <h2 data-i="londonOpen">فتح لندن<span class="hint" data-i="londonOpenHint">وين فتح السعر نسبةً لرينج طوكيو؟</span></h2>
+    <div class="body"><div class="chips" id="openLoc">
+      <button class="chip" data-v="above" data-i="locAbove">فوق الرينج</button>
+      <button class="chip" data-v="atHigh" data-i="locAtHigh">قمة طوكيو</button>
+      <button class="chip" data-v="upper" data-i="locUpper">الثلث العلوي</button>
+      <button class="chip" data-v="mid" data-i="locMid">النص</button>
+      <button class="chip" data-v="lower" data-i="locLower">الثلث السفلي</button>
+      <button class="chip" data-v="atLow" data-i="locAtLow">قاع طوكيو</button>
+      <button class="chip" data-v="below" data-i="locBelow">تحت الرينج</button>
+    </div></div>
+  </div>
+
+  <div class="card" id="moveCard" style="display:none">
+    <h2 data-i="moveTitle">الحركة عند الحافة<span class="hint" data-i="moveHint">فتح عند الحافة — كسر واستمر، لو رفض وعكس؟</span></h2>
+    <div class="body"><div class="chips" id="edgeMove">
+      <button class="chip" data-v="cont" data-i="moveCont">استمر بنفس الاتجاه</button>
+      <button class="chip" data-v="rev" data-i="moveRev">عكس (رفض الحافة)</button>
+    </div></div>
+  </div>
+
+  <div class="card">
+    <h2 data-i="liqTitle">أي سيولة اتّجه لها وأخذها<span class="hint" data-i="liqHint">وين راح السعر — سيولة الفوق لو التحت؟</span></h2>
+    <div class="body"><div class="chips" id="liqTaken">
+      <button class="chip" data-v="up" data-c="up" data-i="liqUp">سيولة الفوق (قمة طوكيو)</button>
+      <button class="chip" data-v="down" data-c="down" data-i="liqDown">سيولة التحت (قاع طوكيو)</button>
+      <button class="chip" data-v="bothDownFirst" data-c="" data-i="liqBothDown">الثنتين — التحت أول</button>
+      <button class="chip" data-v="bothUpFirst" data-c="" data-i="liqBothUp">الثنتين — الفوق أول</button>
+      <button class="chip" data-v="none" data-c="" data-i="liqNone">ولا وحدة (رينج)</button>
+      <button class="chip" data-v="notrade" data-c="nt" data-i="liqNoTrade">غير قابل للتداول</button>
+    </div></div>
+  </div>
+
+  <div class="card" id="targetCard" style="display:none">
+    <h2 data-i="tgtTitle">وصل السيولة المستهدفة؟<span class="hint" data-i="tgtHint">السعر وصل السيولة اللي اتّجه لها فعلاً، لو وقف بالنص؟</span></h2>
+    <div class="body"><div class="chips" id="hitTgt">
+      <button class="chip" data-v="yes" data-i="tgtYes">نعم وصل</button>
+      <button class="chip" data-v="no" data-i="tgtNo">لا، ما وصل</button>
+    </div></div>
+  </div>
+
+  <div class="card" id="reasonCard" style="display:none">
+    <h2 data-i="reasonTitle">سبب عدم التداول<span class="hint" data-i="reasonHint">ليش هاي الجلسة ما تنفع — يتجمع بالإحصائيات</span></h2>
+    <div class="body"><div class="chips" id="reason">
+      <button class="chip" data-v="news" data-i="rNews">أخبار</button>
+      <button class="chip" data-v="choppy" data-i="rChoppy">حركة فوضوية</button>
+      <button class="chip" data-v="tight" data-i="rTight">رينج ضيق</button>
+      <button class="chip" data-v="nosetup" data-i="rNoSetup">ماكو setup واضح</button>
+      <button class="chip" data-v="other" data-i="rOther">سبب ثاني</button>
+    </div></div>
+  </div>
+
+  <div class="card">
+    <h2 data-i="noteTitle">ملاحظة<span class="hint" data-i="noteHint">اختياري — أي تفصيل تريد تتذكره</span></h2>
+    <div class="body"><input type="text" id="sNote" data-i-ph="notePlaceholder" placeholder="مثلاً: NFP الساعة 2، سيولة واضحة تحت القاع..."></div>
+  </div>
+
+  <button class="btn" id="saveSession" data-i="saveBtn">حفظ الجلسة</button>
+
+  <div class="card" style="margin-top:16px">
+    <h2 data-i="recordedTitle">الجلسات المسجّلة</h2>
+    <div class="body"><div class="slist" id="sessList"></div></div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section id="stats">
+  <div class="samplewarn" id="sampleWarn"><span>⚠️</span><span id="sampleWarnText"></span></div>
+  <div class="hero">
+    <div class="stat"><div class="label" data-i="kTotalLabel">إجمالي الجلسات</div><div class="big num" id="kTotal">0</div><div class="sub" id="kTotalSub" data-i="kTotalSub">في قاعدة البيانات</div></div>
+    <div class="stat"><div class="label" data-i="kTradableLabel">قابلة للتداول</div><div class="big num" id="kTradable">0%</div><div class="sub" id="kTradableSub"></div></div>
+    <div class="stat full"><div class="label" data-i="kHitLabel">نسبة الوصول للسيولة المستهدفة</div><div class="big num" style="color:var(--rev)" id="kHitRate">—</div><div class="sub" id="kHitRateSub"></div></div>
+  </div>
+
+  <div class="filterbar">
+    <div class="frow"><div class="flabel"><span data-i="filterOpen">فلتر: مكان الفتح</span><span class="clearf" id="clearOpen" data-i="clearF">إلغاء</span></div><div class="chips" id="fOpen"></div></div>
+    <div class="frow"><div class="flabel"><span data-i="filterDay">فلتر: يوم الأسبوع</span><span class="clearf" id="clearDay" data-i="clearF">إلغاء</span></div><div class="chips" id="fDay"></div></div>
+  </div>
+
+  <div class="card">
+    <h2 data-i="dirTitle">وين يتّجه السعر حسب مكان الفتح<span class="hint" data-i="dirHint">رقمك الأساسي للهدف — لكل مكان فتح، السعر يروح فوق لو تحت</span></h2>
+    <div class="body"><div id="dirBars"></div>
+      <div class="legend"><span><i style="background:var(--up)"></i><span data-i="legUp">سيولة الفوق</span></span><span><i style="background:var(--down)"></i><span data-i="legDown">سيولة التحت</span></span><span><i style="background:var(--notrade)"></i><span data-i="legNoneNt">رينج / لا تداول</span></span></div>
+    </div>
+  </div>
+
+  <div class="card" id="edgeCard">
+    <h2 data-i="edgeTitle">الحركة عند فتح الحافة<span class="hint" data-i="edgeHint">لما يفتح عند قمة أو قاع طوكيو — كم يعكس وكم يستمر</span></h2>
+    <div class="body"><div id="edgeBars"></div></div>
+  </div>
+
+  <div class="card">
+    <h2 data-i="tgtBarsTitle">نسبة الوصول للسيولة المستهدفة<span class="hint" data-i="tgtBarsHint">لكل مكان فتح: من المرات اللي اتّجه لسيولة، كم وصلها فعلاً</span></h2>
+    <div class="body"><div id="tgtBars"></div></div>
+  </div>
+
+  <div class="card">
+    <h2 data-i="dayTitle">أيام الأسبوع<span class="hint" data-i="dayHint">أي يوم غير قابل للتداول غالباً — تجنّبه</span></h2>
+    <div class="body"><div class="tablewrap"><table id="dayTable"></table></div></div>
+  </div>
+
+  <div class="card">
+    <h2 data-i="reasonStatsTitle">أسباب عدم التداول<span class="hint" data-i="reasonStatsHint">الأسباب المتكررة — تتعلّم تتجنبها مبكراً</span></h2>
+    <div class="body"><div id="reasonBars"></div></div>
+  </div>
+
+  <button class="btn ghost" id="exportBtn" data-i="exportBtn">تصدير نسخة احتياطية</button>
+  <button class="btn ghost" id="importBtn" data-i="importBtn">استيراد نسخة</button>
+  <input type="file" id="importFile" accept=".json" style="display:none">
+</section>
+
+<footer><span data-i="footer">SNR Backtest · بياناتك محفوظة بمتصفحك · التحليل والقرار إلك</span><br>Abdulrahman Salih</footer>
+</div>
+
+<script>
+"use strict";
+function store_get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
+function store_set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+
+const I18N={
+  ar:{dir:"rtl",name:"عربي",
+    eyebrow:"SNR · جلسة لندن",title:"سلوك جلسة لندن",subtitle:"سجّل لكل جلسة: وين فتحت لندن، أي سيولة اتّجهت لها، ووصلت الهدف لو لا",
+    recorded:"جلسات مسجّلة:",tabEntry:"تسجيل جلسة",tabStats:"الإحصائيات",
+    tokyoRange:"رينج طوكيو",tokyoHint:"قمة وقاع جلسة طوكيو — اختياري، يحسب المستويات",tokyoHigh:"قمة طوكيو",tokyoLow:"قاع طوكيو",
+    liqAbove:"سيولة فوق القمة",midRange:"نص الرينج",liqBelow:"سيولة تحت القاع",rangeSize:"حجم الرينج",
+    dayTitle2:"يوم الجلسة",dayHint2:"أي يوم كانت الجلسة — يغذّي إحصائية الأيام والفلتر",dayMon:"الاثنين",dayTue:"الثلاثاء",dayWed:"الأربعاء",dayThu:"الخميس",dayFri:"الجمعة",
+    londonOpen:"فتح لندن",londonOpenHint:"وين فتح السعر نسبةً لرينج طوكيو؟",
+    locAbove:"فوق الرينج",locAtHigh:"قمة طوكيو",locUpper:"الثلث العلوي",locMid:"النص",locLower:"الثلث السفلي",locAtLow:"قاع طوكيو",locBelow:"تحت الرينج",
+    moveTitle:"الحركة عند الحافة",moveHint:"فتح عند الحافة — كسر واستمر، لو رفض وعكس؟",moveCont:"استمر بنفس الاتجاه",moveRev:"عكس (رفض الحافة)",
+    liqTitle:"أي سيولة اتّجه لها وأخذها",liqHint:"وين راح السعر — سيولة الفوق لو التحت؟",
+    liqUp:"سيولة الفوق (قمة طوكيو)",liqDown:"سيولة التحت (قاع طوكيو)",liqBothDown:"الثنتين — التحت أول",liqBothUp:"الثنتين — الفوق أول",liqNone:"ولا وحدة (رينج)",liqNoTrade:"غير قابل للتداول",
+    tgtTitle:"وصل السيولة المستهدفة؟",tgtHint:"السعر وصل السيولة اللي اتّجه لها فعلاً، لو وقف بالنص؟",tgtYes:"نعم وصل",tgtNo:"لا، ما وصل",
+    reasonTitle:"سبب عدم التداول",reasonHint:"ليش هاي الجلسة ما تنفع — يتجمع بالإحصائيات",rNews:"أخبار",rChoppy:"حركة فوضوية",rTight:"رينج ضيق",rNoSetup:"ماكو setup واضح",rOther:"سبب ثاني",
+    noteTitle:"ملاحظة",noteHint:"اختياري — أي تفصيل تريد تتذكره",notePlaceholder:"مثلاً: NFP الساعة 2، سيولة واضحة تحت القاع...",
+    saveBtn:"حفظ الجلسة",recordedTitle:"الجلسات المسجّلة",
+    kTotalLabel:"إجمالي الجلسات",kTotalSub:"في قاعدة البيانات",kTradableLabel:"قابلة للتداول",kHitLabel:"نسبة الوصول للسيولة المستهدفة",
+    filterOpen:"فلتر: مكان الفتح",filterDay:"فلتر: يوم الأسبوع",clearF:"إلغاء",
+    dirTitle:"وين يتّجه السعر حسب مكان الفتح",dirHint:"رقمك الأساسي للهدف — لكل مكان فتح، السعر يروح فوق لو تحت",
+    legUp:"سيولة الفوق",legDown:"سيولة التحت",legNoneNt:"رينج / لا تداول",
+    edgeTitle:"الحركة عند فتح الحافة",edgeHint:"لما يفتح عند قمة أو قاع طوكيو — كم يعكس وكم يستمر",
+    tgtBarsTitle:"نسبة الوصول للسيولة المستهدفة",tgtBarsHint:"لكل مكان فتح: من المرات اللي اتّجه لسيولة، كم وصلها فعلاً",
+    dayTitle:"أيام الأسبوع",dayHint:"أي يوم غير قابل للتداول غالباً — تجنّبه",
+    reasonStatsTitle:"أسباب عدم التداول",reasonStatsHint:"الأسباب المتكررة — تتعلّم تتجنبها مبكراً",
+    exportBtn:"تصدير نسخة احتياطية",importBtn:"استيراد نسخة",
+    footer:"SNR Backtest · بياناتك محفوظة بمتصفحك · التحليل والقرار إلك",
+    kTotalSub2:"في قاعدة البيانات",sessUnit:"جلسة",
+    tradableOf:(a,b)=>`${a} من ${b} جلسة`,hitOf:(a,b)=>`${a} وصل من ${b}`,noDir:"ماكو جلسات اتّجاه بعد",
+    sampleWarn:n=>`العينة صغيرة (${n} جلسة). النسب غير موثوقة بعد — تحتاج 20+ جلسة لكل فئة.`,
+    dayHead:"اليوم",ntHead:"غير قابل للتداول",domHead:"الأغلب اتّجاه",cntHead:"عدد",
+    noData:"سجّل جلسات حتى يتكوّن الجدول",noReasons:"ماكو جلسات غير قابلة للتداول بعد",noEdge:"ماكو جلسات فتحت عند الحافة بعد",
+    confirmDel:"حذف هاي الجلسة؟",alertOpen:"اختر مكان فتح لندن",alertDay:"اختر يوم الجلسة",alertLiq:"اختر أي سيولة اتّجه لها",alertMove:"اختر الحركة عند الحافة",alertTgt:"اختر: هل وصل السيولة المستهدفة؟",imported:"انسترجعت البيانات ✓",badFile:"الملف غير صالح",
+    days:['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'],
+    liqShort:{up:'↑ الفوق',down:'↓ التحت',bothDownFirst:'الثنتين (تحت أول)',bothUpFirst:'الثنتين (فوق أول)',none:'رينج',notrade:'لا تداول'},
+    moveShort:{cont:'استمر',rev:'عكس'},
+    reasons:{news:'أخبار',choppy:'فوضوي',tight:'رينج ضيق',nosetup:'ماكو setup',other:'ثاني'},
+    openShort:{above:'فوق',atHigh:'قمة',upper:'علوي',mid:'نص',lower:'سفلي',atLow:'قاع',below:'تحت'}
+  },
+  de:{dir:"ltr",name:"Deutsch",
+    eyebrow:"SNR · London Session",title:"London Session Verhalten",subtitle:"Erfasse je Session: wo London öffnete, welche Liquidität angesteuert wurde und ob das Ziel erreicht wurde",
+    recorded:"Erfasste Sessions:",tabEntry:"Session erfassen",tabStats:"Statistik",
+    tokyoRange:"Tokyo Range",tokyoHint:"Hoch & Tief der Tokyo-Session — optional, berechnet die Levels",tokyoHigh:"Tokyo Hoch",tokyoLow:"Tokyo Tief",
+    liqAbove:"Liquidität über Hoch",midRange:"Range-Mitte",liqBelow:"Liquidität unter Tief",rangeSize:"Range-Größe",
+    dayTitle2:"Tag der Session",dayHint2:"An welchem Tag war die Session — speist Tagesstatistik & Filter",dayMon:"Montag",dayTue:"Dienstag",dayWed:"Mittwoch",dayThu:"Donnerstag",dayFri:"Freitag",
+    londonOpen:"London Open",londonOpenHint:"Wo öffnete der Preis relativ zur Tokyo Range?",
+    locAbove:"Über Range",locAtHigh:"Tokyo Hoch",locUpper:"Oberes Drittel",locMid:"Mitte",locLower:"Unteres Drittel",locAtLow:"Tokyo Tief",locBelow:"Unter Range",
+    moveTitle:"Bewegung an der Kante",moveHint:"Open an der Kante — gebrochen & weiter, oder abgelehnt & gedreht?",moveCont:"Weiter in gleiche Richtung",moveRev:"Gedreht (Kante abgelehnt)",
+    liqTitle:"Welche Liquidität angesteuert",liqHint:"Wohin lief der Preis — obere oder untere Liquidität?",
+    liqUp:"Obere Liquidität (Tokyo Hoch)",liqDown:"Untere Liquidität (Tokyo Tief)",liqBothDown:"Beide — Tief zuerst",liqBothUp:"Beide — Hoch zuerst",liqNone:"Keine (Range)",liqNoTrade:"Nicht handelbar",
+    tgtTitle:"Zielliquidität erreicht?",tgtHint:"Hat der Preis die angesteuerte Liquidität erreicht oder auf halbem Weg gestoppt?",tgtYes:"Ja, erreicht",tgtNo:"Nein, nicht erreicht",
+    reasonTitle:"Grund: nicht handelbar",reasonHint:"Warum taugt diese Session nicht — wird gesammelt",rNews:"News",rChoppy:"Choppy",rTight:"Enge Range",rNoSetup:"Kein klares Setup",rOther:"Anderer Grund",
+    noteTitle:"Notiz",noteHint:"Optional — Details die du dir merken willst",notePlaceholder:"z.B. NFP um 14:00, klare Liquidität unter dem Tief...",
+    saveBtn:"Session speichern",recordedTitle:"Erfasste Sessions",
+    kTotalLabel:"Sessions gesamt",kTotalSub:"in der Datenbank",kTradableLabel:"Handelbar",kHitLabel:"Trefferquote Zielliquidität",
+    filterOpen:"Filter: Open-Position",filterDay:"Filter: Wochentag",clearF:"Zurücksetzen",
+    dirTitle:"Wohin der Preis läuft je Open",dirHint:"Deine Kernzahl fürs Ziel — je Open, läuft der Preis hoch oder runter",
+    legUp:"Obere Liq.",legDown:"Untere Liq.",legNoneNt:"Range / kein Trade",
+    edgeTitle:"Bewegung beim Kanten-Open",edgeHint:"Bei Open am Tokyo Hoch/Tief — wie oft Drehung vs. Fortsetzung",
+    tgtBarsTitle:"Trefferquote Zielliquidität",tgtBarsHint:"Je Open: von den angesteuerten Fällen, wie oft erreicht",
+    dayTitle:"Wochentage",dayHint:"Welcher Tag meist nicht handelbar ist — meide ihn",
+    reasonStatsTitle:"Gründe: nicht handelbar",reasonStatsHint:"Häufige Gründe — lerne sie früh zu meiden",
+    exportBtn:"Backup exportieren",importBtn:"Backup importieren",
+    footer:"SNR Backtest · Daten im Browser gespeichert · Analyse & Entscheidung liegen bei dir",
+    sessUnit:"Sessions",
+    tradableOf:(a,b)=>`${a} von ${b} Sessions`,hitOf:(a,b)=>`${a} erreicht von ${b}`,noDir:"Noch keine Richtungs-Sessions",
+    sampleWarn:n=>`Kleine Stichprobe (${n} Sessions). Werte noch nicht verlässlich — 20+ je Kategorie nötig.`,
+    dayHead:"Tag",ntHead:"Nicht handelbar",domHead:"Dom. Richtung",cntHead:"Anz.",
+    noData:"Erfasse Sessions, damit die Tabelle entsteht",noReasons:"Noch keine nicht-handelbaren Sessions",noEdge:"Noch keine Kanten-Opens",
+    confirmDel:"Diese Session löschen?",alertOpen:"Wähle London Open",alertDay:"Wähle den Tag",alertLiq:"Wähle angesteuerte Liquidität",alertMove:"Wähle die Bewegung an der Kante",alertTgt:"Wähle: Zielliquidität erreicht?",imported:"Daten wiederhergestellt ✓",badFile:"Ungültige Datei",
+    days:['So','Mo','Di','Mi','Do','Fr','Sa'],
+    liqShort:{up:'↑ Oben',down:'↓ Unten',bothDownFirst:'Beide (Tief zuerst)',bothUpFirst:'Beide (Hoch zuerst)',none:'Range',notrade:'No Trade'},
+    moveShort:{cont:'Weiter',rev:'Dreh'},
+    reasons:{news:'News',choppy:'Choppy',tight:'Enge Range',nosetup:'Kein Setup',other:'Anderer'},
+    openShort:{above:'Über',atHigh:'Hoch',upper:'Oben',mid:'Mitte',lower:'Unten',atLow:'Tief',below:'Unter'}
+  },
+  en:{dir:"ltr",name:"English",
+    eyebrow:"SNR · London Session",title:"London Session Behaviour",subtitle:"Log per session: where London opened, which liquidity it targeted, and whether it reached the target",
+    recorded:"Sessions logged:",tabEntry:"Log session",tabStats:"Statistics",
+    tokyoRange:"Tokyo Range",tokyoHint:"Tokyo session high & low — optional, computes the levels",tokyoHigh:"Tokyo High",tokyoLow:"Tokyo Low",
+    liqAbove:"Liquidity above high",midRange:"Range midpoint",liqBelow:"Liquidity below low",rangeSize:"Range size",
+    dayTitle2:"Session day",dayHint2:"Which day the session was — feeds the day stats & filter",dayMon:"Monday",dayTue:"Tuesday",dayWed:"Wednesday",dayThu:"Thursday",dayFri:"Friday",
+    londonOpen:"London Open",londonOpenHint:"Where did price open relative to the Tokyo range?",
+    locAbove:"Above range",locAtHigh:"Tokyo high",locUpper:"Upper third",locMid:"Middle",locLower:"Lower third",locAtLow:"Tokyo low",locBelow:"Below range",
+    moveTitle:"Move at the edge",moveHint:"Open at the edge — broke & continued, or rejected & reversed?",moveCont:"Continued same direction",moveRev:"Reversed (rejected edge)",
+    liqTitle:"Which liquidity it targeted",liqHint:"Where did price go — upper or lower liquidity?",
+    liqUp:"Upper liquidity (Tokyo high)",liqDown:"Lower liquidity (Tokyo low)",liqBothDown:"Both — low first",liqBothUp:"Both — high first",liqNone:"Neither (range)",liqNoTrade:"Not tradable",
+    tgtTitle:"Reached targeted liquidity?",tgtHint:"Did price reach the liquidity it targeted, or stop midway?",tgtYes:"Yes, reached",tgtNo:"No, missed",
+    reasonTitle:"Reason: not tradable",reasonHint:"Why this session is no good — gets aggregated",rNews:"News",rChoppy:"Choppy",rTight:"Tight range",rNoSetup:"No clear setup",rOther:"Other reason",
+    noteTitle:"Note",noteHint:"Optional — any detail you want to remember",notePlaceholder:"e.g. NFP at 2pm, clean liquidity below the low...",
+    saveBtn:"Save session",recordedTitle:"Logged sessions",
+    kTotalLabel:"Total sessions",kTotalSub:"in the database",kTradableLabel:"Tradable",kHitLabel:"Targeted liquidity hit rate",
+    filterOpen:"Filter: open location",filterDay:"Filter: weekday",clearF:"Clear",
+    dirTitle:"Where price heads by open",dirHint:"Your core number for the target — per open, does price go up or down",
+    legUp:"Upper liq.",legDown:"Lower liq.",legNoneNt:"Range / no trade",
+    edgeTitle:"Move on edge open",edgeHint:"When opening at Tokyo high/low — how often reversal vs continuation",
+    tgtBarsTitle:"Targeted liquidity hit rate",tgtBarsHint:"Per open: of the times it targeted liquidity, how often it reached it",
+    dayTitle:"Weekdays",dayHint:"Which day is usually not tradable — avoid it",
+    reasonStatsTitle:"Reasons: not tradable",reasonStatsHint:"Recurring reasons — learn to avoid them early",
+    exportBtn:"Export backup",importBtn:"Import backup",
+    footer:"SNR Backtest · data stored in your browser · analysis & decision are yours",
+    sessUnit:"sessions",
+    tradableOf:(a,b)=>`${a} of ${b} sessions`,hitOf:(a,b)=>`${a} reached of ${b}`,noDir:"No directional sessions yet",
+    sampleWarn:n=>`Small sample (${n} sessions). Percentages aren't reliable yet — need 20+ per category.`,
+    dayHead:"Day",ntHead:"Not tradable",domHead:"Dom. direction",cntHead:"Count",
+    noData:"Log sessions to build the table",noReasons:"No not-tradable sessions yet",noEdge:"No edge opens yet",
+    confirmDel:"Delete this session?",alertOpen:"Choose London open",alertDay:"Choose the day",alertLiq:"Choose targeted liquidity",alertMove:"Choose the move at the edge",alertTgt:"Choose: reached targeted liquidity?",imported:"Data restored ✓",badFile:"Invalid file",
+    days:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
+    liqShort:{up:'↑ Upper',down:'↓ Lower',bothDownFirst:'Both (low first)',bothUpFirst:'Both (high first)',none:'Range',notrade:'No Trade'},
+    moveShort:{cont:'Cont.',rev:'Rev.'},
+    reasons:{news:'News',choppy:'Choppy',tight:'Tight',nosetup:'No setup',other:'Other'},
+    openShort:{above:'Above',atHigh:'High',upper:'Upper',mid:'Mid',lower:'Lower',atLow:'Low',below:'Below'}
+  }
+};
+const LANGS=['ar','de','en'];
+let lang=store_get('snr_bt2_lang','ar');
+let theme=store_get('snr_bt2_theme','dark');
+let sessions=store_get('snr_bt2_sessions',[]).filter(s=>s&&s.liq);
+
+const LOC_ORDER=['above','atHigh','upper','mid','lower','atLow','below'];
+const EDGE_OPENS=['atHigh','atLow'];
+const REASON_ORDER=['news','choppy','tight','nosetup','other'];
+// أي سيولة "اتّجه لها" نهائياً — للاتجاه: up أو bothUpFirst→نعتبر النهاية، نبسطها: up/down/both/none/notrade
+const T=()=>I18N[lang];
+const todayStr=()=>new Date().toISOString().slice(0,10);
+const fmt=n=>Number(n).toLocaleString('en-US',{maximumFractionDigits:2});
+const pct=(a,b)=>b?Math.round(a/b*100):0;
+// تصنيف الاتجاه العام (فوق/تحت) من قيمة liq
+function dirOf(liq){
+  if(liq==='up'||liq==='bothUpFirst')return 'up';      // انتهى/بدأ صعود نحو الفوق
+  if(liq==='down'||liq==='bothDownFirst')return 'down';
+  return 'neutral'; // none/notrade
+}
+const isTargeted=liq=>liq==='up'||liq==='down'; // اتّجه لسيولة وحدة واضحة (نقيس وصولها)
+
+/* ---------- lang + theme ---------- */
+function applyLang(){
+  const t=T();
+  document.documentElement.lang=lang;
+  document.documentElement.dir=t.dir;
+  const ll=document.getElementById('langLabel');if(ll)ll.textContent=t.name;
+  document.querySelectorAll('[data-i]').forEach(el=>{
+    const key=el.getAttribute('data-i');if(t[key]===undefined)return;
+    const nested=el.querySelector('.sub,.hint');
+    if(nested){
+      // عدّل أول عقدة نصية فقط، وإذا ماكو أنشئها
+      if(el.firstChild&&el.firstChild.nodeType===3)el.firstChild.nodeValue=t[key];
+      else el.insertBefore(document.createTextNode(t[key]),el.firstChild);
+    }else{el.textContent=t[key];}
+  });
+  document.querySelectorAll('[data-i-ph]').forEach(el=>{const k=el.getAttribute('data-i-ph');if(t[k]!==undefined)el.placeholder=t[k];});
+  document.querySelectorAll('[data-i] .sub,[data-i] .hint').forEach(s=>{
+    const parent=s.closest('[data-i]');if(!parent)return;const pk=parent.getAttribute('data-i');
+    const map={title:'subtitle',tokyoRange:'tokyoHint',dayTitle2:'dayHint2',londonOpen:'londonOpenHint',moveTitle:'moveHint',liqTitle:'liqHint',tgtTitle:'tgtHint',reasonTitle:'reasonHint',noteTitle:'noteHint',dirTitle:'dirHint',edgeTitle:'edgeHint',tgtBarsTitle:'tgtBarsHint',dayTitle:'dayHint',reasonStatsTitle:'reasonStatsHint'};
+    if(map[pk]&&t[map[pk]]!==undefined)s.textContent=t[map[pk]];
+  });
+  buildFilters();renderSess();
+  if(document.getElementById('stats').classList.contains('on'))renderStats();
+}
+function applyTheme(){document.documentElement.setAttribute('data-theme',theme);const tb=document.getElementById('themeBtn');if(tb)tb.textContent=theme==='dark'?'🌙':'☀️';}
+
+document.getElementById('tabs').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('section').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');const sec=document.getElementById(b.dataset.t);sec.classList.add('on');void sec.offsetWidth;
+  if(b.dataset.t==='stats')renderStats();
+});
+
+function chipGroup(id,onSel){
+  const el=document.getElementById(id);
+  if(!el)return ()=>null;
+  el.addEventListener('click',e=>{
+    const b=e.target.closest('.chip');if(!b)return;
+    el.querySelectorAll('.chip').forEach(c=>c.classList.remove('sel','up','down','nt'));
+    b.classList.add('sel');const c=b.dataset.c;if(c)b.classList.add(c);
+    if(onSel)onSel(b.dataset.v);
+  });
+  return ()=>el.querySelector('.chip.sel')?.dataset.v||null;
+}
+const getDayPick=chipGroup('dayPick');
+const getTgt=chipGroup('hitTgt');
+const getReason=chipGroup('reason');
+const getMove=chipGroup('edgeMove');
+const getOpen=chipGroup('openLoc',v=>{
+  document.getElementById('moveCard').style.display=EDGE_OPENS.includes(v)?'block':'none';
+});
+const getLiq=chipGroup('liqTaken',v=>{
+  document.getElementById('targetCard').style.display=isTargeted(v)?'block':'none';
+  document.getElementById('reasonCard').style.display=v==='notrade'?'block':'none';
+});
+
+function calcLv(){
+  const h=+document.getElementById('tHigh').value,l=+document.getElementById('tLow').value;
+  const box=document.getElementById('lvBox');
+  if(!h||!l||h<=l){box.style.display='none';return}
+  box.style.display='block';
+  document.getElementById('lvHigh').textContent=fmt(h)+' ↑';
+  document.getElementById('lvMid').textContent=fmt((h+l)/2);
+  document.getElementById('lvLow').textContent=fmt(l)+' ↓';
+  document.getElementById('lvSize').textContent=fmt(h-l)+' pt';
+}
+document.getElementById('tHigh').addEventListener('input',calcLv);
+document.getElementById('tLow').addEventListener('input',calcLv);
+
+document.getElementById('saveSession').onclick=()=>{
+  const t=T();
+  const h=+document.getElementById('tHigh').value;
+  const l=+document.getElementById('tLow').value;
+  const open=getOpen(),liq=getLiq(),wd=getDayPick();
+  if(!open){alert(t.alertOpen);return}
+  if(!wd){alert(t.alertDay);return}
+  const move=EDGE_OPENS.includes(open)?getMove():null;
+  if(EDGE_OPENS.includes(open)&&!move){alert(t.alertMove);return}
+  if(!liq){alert(t.alertLiq);return}
+  const tgt=isTargeted(liq)?getTgt():null;
+  if(isTargeted(liq)&&!tgt){alert(t.alertTgt);return}
+  const reason=liq==='notrade'?getReason():null;
+  const note=document.getElementById('sNote').value.trim()||null;
+  sessions.unshift({wd:+wd,high:h||null,low:l||null,open,move,liq,tgt,reason,note});
+  store_set('snr_bt2_sessions',sessions);renderSess();
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('sel','up','down','nt'));
+  document.getElementById('moveCard').style.display='none';
+  document.getElementById('targetCard').style.display='none';
+  document.getElementById('reasonCard').style.display='none';
+  document.getElementById('sNote').value='';
+};
+
+function renderSess(){
+  const t=T();
+  document.getElementById('sessCount').textContent=sessions.length;
+  const el=document.getElementById('sessList');
+  if(!sessions.length){el.innerHTML=`<div class="empty">${t.noData}</div>`;return}
+  el.innerHTML=sessions.slice(0,40).map((s,i)=>{
+    const d=dirOf(s.liq);
+    const liqCls=d==='up'?'up':d==='down'?'down':s.liq==='notrade'?'nt':'neu';
+    const moveTag=s.move?`<span class="tag move">${t.moveShort[s.move]}</span>`:'';
+    const tgtTag=s.tgt==='yes'?`<span class="tag tgt">${t.tgtYes}</span>`:s.tgt==='no'?`<span class="tag neu">${t.tgtNo}</span>`:'';
+    const rTag=s.reason?`<span class="tag nt">${t.reasons[s.reason]||s.reason}</span>`:'';
+    const note=s.note?`<span class="note">“${s.note}”</span>`:'';
+    return `<div class="sitem" style="animation-delay:${Math.min(i*30,300)}ms">
+      <div class="meta">
+        <div class="line1"><span class="tag ${liqCls}">${t.liqShort[s.liq]}</span>${moveTag}${tgtTag}${rTag}</div>
+        <span class="date">${t.days[s.wd]} · ${t.openShort[s.open]}</span>${note}
+      </div>
+      <button class="del" data-idx="${i}" aria-label="x">✕</button>
+    </div>`;
+  }).join('');
+}
+document.getElementById('sessList').addEventListener('click',e=>{
+  const b=e.target.closest('.del');if(!b)return;
+  if(confirm(T().confirmDel)){sessions.splice(+b.getAttribute('data-idx'),1);store_set('snr_bt2_sessions',sessions);renderSess();}
+});
+
+/* ---------- filters ---------- */
+let filterOpen=null,filterDay=null;
+function buildFilters(){
+  const t=T();
+  document.getElementById('fOpen').innerHTML=LOC_ORDER.map(L=>`<button class="chip fchip${filterOpen===L?' sel':''}" data-v="${L}">${t.openShort[L]}</button>`).join('');
+  let dh='';for(let d=1;d<=5;d++)dh+=`<button class="chip fchip${filterDay===d?' sel':''}" data-v="${d}">${t.days[d]}</button>`;
+  document.getElementById('fDay').innerHTML=dh;
+}
+document.getElementById('fOpen').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;filterOpen=filterOpen===b.dataset.v?null:b.dataset.v;buildFilters();renderStats();});
+document.getElementById('fDay').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;const v=+b.dataset.v;filterDay=filterDay===v?null:v;buildFilters();renderStats();});
+document.getElementById('clearOpen').onclick=()=>{filterOpen=null;buildFilters();renderStats();};
+document.getElementById('clearDay').onclick=()=>{filterDay=null;buildFilters();renderStats();};
+function filtered(){return sessions.filter(s=>(filterOpen===null||s.open===filterOpen)&&(filterDay===null||s.wd===filterDay));}
+
+function countUp(el,target,suffix){
+  const dur=700,t0=performance.now();
+  function step(t){const k=Math.min((t-t0)/dur,1),e=1-Math.pow(1-k,3);el.textContent=Math.round(target*e)+(suffix||'');if(k<1)requestAnimationFrame(step);}
+  requestAnimationFrame(step);
+}
+// شريط مكدّس (فوق/تحت/محايد)
+function stackBar(label,up,down,neu,total){
+  const u=pct(up,total),d=pct(down,total),nn=100-u-d;
+  return `<div class="bar"><div class="top"><span class="bl">${label}</span><span class="bv">↑${u}% · ↓${d}% <span style="color:var(--faint)">(${total})</span></span></div>
+    <div class="track">
+      <div class="seg" data-w="${u}" style="background:linear-gradient(90deg,var(--up),#7FE0B0)"></div>
+      <div class="seg" data-w="${d}" style="background:linear-gradient(90deg,var(--down),#EE8B84)"></div>
+      <div class="seg" data-w="${nn}" style="background:var(--notrade);opacity:.5"></div>
+    </div></div>`;
+}
+
+function renderStats(){
+  const t=T();
+  const data=filtered();
+  const n=data.length;
+  const sw=document.getElementById('sampleWarn');
+  if(n>0&&n<20){sw.classList.remove('hide');document.getElementById('sampleWarnText').textContent=t.sampleWarn(n);}else sw.classList.add('hide');
+
+  countUp(document.getElementById('kTotal'),n,'');
+  document.getElementById('kTotalSub').textContent=t.kTotalSub;
+  const tradable=data.filter(s=>s.liq!=='notrade'&&s.liq!=='none').length;
+  countUp(document.getElementById('kTradable'),pct(tradable,n),'%');
+  document.getElementById('kTradableSub').textContent=t.tradableOf(tradable,n);
+  const targeted=data.filter(s=>isTargeted(s.liq));
+  const reached=targeted.filter(s=>s.tgt==='yes').length;
+  const hr=document.getElementById('kHitRate');
+  if(targeted.length){countUp(hr,pct(reached,targeted.length),'%');document.getElementById('kHitRateSub').textContent=t.hitOf(reached,targeted.length);}
+  else{hr.textContent='—';document.getElementById('kHitRateSub').textContent=t.noDir;}
+
+  // اتجاه السعر حسب مكان الفتح (شريط مكدّس)
+  let db='';
+  LOC_ORDER.forEach(L=>{
+    const rows=data.filter(s=>s.open===L);if(!rows.length)return;
+    const up=rows.filter(s=>dirOf(s.liq)==='up').length;
+    const down=rows.filter(s=>dirOf(s.liq)==='down').length;
+    const neu=rows.length-up-down;
+    db+=stackBar(t.openShort[L],up,down,neu,rows.length);
+  });
+  document.getElementById('dirBars').innerHTML=db||`<div class="empty">${t.noDir}</div>`;
+
+  // الحركة عند الحافة
+  let eb='';
+  EDGE_OPENS.forEach(L=>{
+    const rows=data.filter(s=>s.open===L&&s.move);if(!rows.length)return;
+    const rev=rows.filter(s=>s.move==='rev').length;
+    const revP=pct(rev,rows.length),contP=100-revP;
+    eb+=`<div class="bar"><div class="top"><span class="bl">${t.openShort[L]}</span><span class="bv">${t.moveShort.rev} ${revP}% · ${t.moveShort.cont} ${contP}% <span style="color:var(--faint)">(${rows.length})</span></span></div>
+      <div class="track"><div class="seg" data-w="${revP}" style="background:linear-gradient(90deg,var(--up),#7FE0B0)"></div><div class="seg" data-w="${contP}" style="background:linear-gradient(90deg,var(--down),#EE8B84)"></div></div></div>`;
+  });
+  document.getElementById('edgeBars').innerHTML=eb||`<div class="empty">${t.noEdge}</div>`;
+
+  // الوصول للسيولة المستهدفة
+  let tb='';
+  LOC_ORDER.forEach(L=>{
+    const tg=data.filter(s=>s.open===L&&isTargeted(s.liq));if(!tg.length)return;
+    const rr=tg.filter(s=>s.tgt==='yes').length,p=pct(rr,tg.length);
+    tb+=`<div class="bar"><div class="top"><span class="bl">${t.openShort[L]}</span><span class="bv">${p}% <span style="color:var(--faint)">(${tg.length})</span></span></div>
+      <div class="track"><div class="seg" data-w="${p}" style="background:linear-gradient(90deg,var(--accent),#7FD0D9)"></div></div></div>`;
+  });
+  document.getElementById('tgtBars').innerHTML=tb||`<div class="empty">${t.noDir}</div>`;
+
+  // أيام الأسبوع
+  const dayData=sessions.filter(s=>filterOpen===null||s.open===filterOpen);
+  let dt=`<tr><th>${t.dayHead}</th><th>${t.ntHead}</th><th>${t.domHead}</th><th>${t.cntHead}</th></tr>`;
+  let anyD=false;
+  for(let d=0;d<7;d++){
+    const rows=dayData.filter(s=>s.wd===d);if(!rows.length)continue;anyD=true;
+    const ntP=pct(rows.filter(s=>s.liq==='notrade').length,rows.length);
+    const up=rows.filter(s=>dirOf(s.liq)==='up').length,down=rows.filter(s=>dirOf(s.liq)==='down').length;
+    const dom=up>down?'↑':down>up?'↓':'—';
+    const col=ntP>=40?'var(--down)':ntP>=20?'var(--warn)':'var(--up)';
+    const hl=filterDay===d?' class="frow-on"':'';
+    dt+=`<tr${hl}><td>${t.days[d]}</td><td class="val" style="color:${col};font-weight:700">${ntP}%</td><td class="val">${dom}</td><td class="val" style="color:var(--muted)">${rows.length}</td></tr>`;
+  }
+  document.getElementById('dayTable').innerHTML=anyD?dt:`<tr><td class="empty">${t.noData}</td></tr>`;
+
+  // أسباب عدم التداول
+  const nt=data.filter(s=>s.liq==='notrade'&&s.reason);
+  let rb='';
+  if(nt.length){REASON_ORDER.forEach(R=>{const c=nt.filter(s=>s.reason===R).length;if(!c)return;const p=pct(c,nt.length);
+    rb+=`<div class="bar"><div class="top"><span class="bl">${t.reasons[R]}</span><span class="bv">${p}% <span style="color:var(--faint)">(${c})</span></span></div>
+      <div class="track"><div class="seg" data-w="${p}" style="background:linear-gradient(90deg,var(--notrade),#9AA3AF)"></div></div></div>`;});}
+  document.getElementById('reasonBars').innerHTML=rb||`<div class="empty">${t.noReasons}</div>`;
+
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{document.querySelectorAll('#stats .seg').forEach(f=>f.style.width=f.dataset.w+'%');}));
+}
+
+document.getElementById('exportBtn').onclick=()=>{
+  const blob=new Blob([JSON.stringify({sessions},null,1)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='snr-backtest-'+todayStr()+'.json';a.click();
+};
+document.getElementById('importBtn').onclick=()=>document.getElementById('importFile').click();
+document.getElementById('importFile').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;const rd=new FileReader();
+  rd.onload=()=>{try{const d=JSON.parse(rd.result);
+    if(Array.isArray(d.sessions)){sessions=d.sessions.filter(s=>s&&s.liq);store_set('snr_bt2_sessions',sessions);renderSess();renderStats();alert(T().imported);}
+    else alert(T().badFile);
+  }catch(err){alert(T().badFile)}};
+  rd.readAsText(f);
+});
+
+/* ---------- kickoff (يشتغل بعد اكتمال الصفحة، محمي) ---------- */
+function init(){
+  try{ applyTheme(); }catch(e){ console.error('theme',e); }
+  try{ applyLang(); }catch(e){ console.error('lang',e); }
+  // ربط أزرار اللغة والثيم
+  const tb=document.getElementById('themeBtn');
+  if(tb)tb.onclick=()=>{theme=theme==='dark'?'light':'dark';store_set('snr_bt2_theme',theme);applyTheme()};
+  const lb=document.getElementById('langBtn');
+  if(lb)lb.onclick=()=>{lang=LANGS[(LANGS.indexOf(lang)+1)%LANGS.length];store_set('snr_bt2_lang',lang);applyLang()};
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);
+else init();
+</script>
+</body>
+</html>
